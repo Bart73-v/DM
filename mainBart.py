@@ -1,47 +1,90 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.preprocessing import LabelEncoder
 import pandas as pd
 from sklearn import tree
-import re
+from sklearn.model_selection import KFold
 
-def encode(df):
-    encoder = LabelEncoder()
-    for column in df.columns:
-        for unique in df[column].unique():
-            if isinstance(unique, str):
-                if not re.match('^[0-9]*$', unique):
-                    df[column] = encoder.fit_transform(df[column])
-                    break
-    return df
+#-----------------------------------------------------------
 
-df = pd.read_csv('.\student-mat.csv', sep=';')
-df = encode(df)
-
-data = np.array(df)
-attributes = np.array(df.columns)
-y = data[:,-1]
-for ind, grade in enumerate(y):
-    if grade >= 10:
-        y[ind] = 1
-    else: y[ind] = 0
+def getData(mode):
+    df = pd.read_csv(R'.\student-mat.csv', sep=';')
+    dy = np.array(df['G3'])
+    if mode==1:
+        df = df.drop(columns=["G1", "G2", "G3"])
+    elif mode == 2:
+        df = df.drop(columns="G3")
+    df = encode(df)
+    df.head()
+    data = np.array(df)
+    dAttributes = np.array(df.columns)
+    return data, dy, dAttributes
 
 
-data = np.delete(data, -1, 1)
-data = np.delete(data, -1, 1)
-data = np.delete(data, -1, 1)
+def encode(datframe):
+        # encode binary nominal attributes
+    cleanup_bins = {"school" :      {"GP" : -1, "MS" : 1},
+                    "sex" :         {"F" : -1, "M" : 1},
+                    "address" :     {"U" : -1, "R" : 1},
+                    "famsize" :     {"LE3": -1, "GT3" : 1},
+                    "Pstatus" :     {"T" : -1, "A" : 1}}
+    datframe = datframe.replace(cleanup_bins)
+        # encode other nominal attributes using dummy variables
+    one_hot_MF = pd.get_dummies(datframe["Mjob"]).join(pd.get_dummies(datframe["Fjob"]), lsuffix='_M', rsuffix='_F')
+    one_hot_RG = pd.get_dummies(datframe["reason"]).join(pd.get_dummies(datframe["guardian"]), lsuffix='_R', rsuffix='_G')
+    datframe = datframe.drop(columns=["Mjob", "Fjob", "reason", "guardian"])
+    datframe = datframe.join([one_hot_MF, one_hot_RG])
+    datframe = datframe.replace({'yes': 1, 'no': 0})
+    return datframe
+    
+
+def createYBin(y):
+    result = np.copy(y)
+    for ind, val in enumerate(result):
+        if val >= 10:
+            result[ind] = 1
+        else: result[ind] = 0
+    return result
 
 
+def createYClas(y):
+    result = np.copy(y)
+    for ind, val in enumerate(result):
+        if val >= 16:
+            result[ind] = 4
+        elif val >= 12:
+            result[ind] = 3
+        elif val >= 8:
+            result[ind] = 2
+        elif val >= 4:
+            result[ind] = 1
+        else: result[ind] = 0
+    return result
 
-def get_clf_tree(max_depth):
-    clf = tree.DecisionTreeClassifier(max_depth=max_depth)
-    clf.min_samples_split = 100
-    return clf
 
+def clf_tree(samples, target, attributes, i): #https://scikit-learn.org/stable/modules/tree.html#classification
+    clf = tree.DecisionTreeClassifier(max_depth=i) #max_depth=
+    #clf.min_samples_split = 10
+    kf = KFold(n_splits=10)
+    accuracy = []
+    for train_index, test_index in kf.split(samples):
+        X_train, X_test = samples[train_index], samples[test_index]
+        y_train, y_test = target[train_index], target[test_index]
+        fold_acc = []
+        for i in range(0,5):
+            clf.fit(X_train, y_train.ravel())
+            fold_acc.append(clf.score(X_test, y_test))
+        accuracy.append(max(fold_acc))
+    return np.mean(accuracy)
 
-fig = plt.figure(figsize=[20,10])
-clf = get_clf_tree(999)
-clf = clf.fit(data,y)
-fig = tree.plot_tree(clf, feature_names=attributes, fontsize=7)
-plt.show()
-print("Figure 1: Decision tree for the Wine dataset with a sample split of 100")
+#-----------------------------------------------------------
+# mode 1, best at max depth 1, 72%
+# mode 2, best at max depth 2, 91%
+
+X, y, attributes = getData(2)
+yBin = createYBin(y)
+yClas = createYClas(y)
+depth = []
+for i in range(1,100):
+    depth.append([clf_tree(X,yClas,attributes,i), i])
+print(max(depth))
+
