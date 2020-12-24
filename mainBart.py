@@ -77,12 +77,14 @@ def clf_tree(samples, target, attributes, i): #https://scikit-learn.org/stable/m
     return np.mean(accuracy)
 
 #-----------------------------------------------------------
-
+# mode 1, best at max depth 1, 72%
+# mode 2, best at max depth 2, 91%
 
 X, y, attributes = getData(2)
 yBin = createYBin(y)
+yClas = createYClas(y)
 depth = []
 for i in range(1,100):
-    depth.append([clf_tree(X,yBin,attributes,i), i])
+    depth.append([clf_tree(X,yClas,attributes,i), i])
 print(max(depth))
 

@@ -6,7 +6,7 @@ X Alter nominal data
     (dependent?) categoritcal: 
         1 of C encoding
 
-- Hyper parameters:
+X Hyper parameters:
         - K-fold Cross Validation (modelEval p.24...)
 
 - Compare models -> CompareClassifier paper?
